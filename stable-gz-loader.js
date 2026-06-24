@@ -1,9 +1,9 @@
 (async () => {
   try {
     const paths = [
-      './stable-gz/part1.b64?v=20260624-1',
-      './stable-gz/part2.b64?v=20260624-1',
-      './stable-gz/part3.b64?v=20260624-1'
+      './stable-gz/part1.b64?v=20260624-3',
+      './stable-gz/part2.b64?v=20260624-3',
+      './stable-gz/part3.b64?v=20260624-3'
     ];
 
     const parts = await Promise.all(paths.map(async (path) => {
@@ -25,7 +25,11 @@
     const decompressed = new Blob([bytes])
       .stream()
       .pipeThrough(new DecompressionStream('gzip'));
-    const html = await new Response(decompressed).text();
+    let html = await new Response(decompressed).text();
+    html = html.replace(
+      '</body>',
+      '<script src="./output-fix-v1.js?v=20260624-3"><\/script></body>'
+    );
 
     document.open();
     document.write(html);
