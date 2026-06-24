@@ -9,10 +9,10 @@
 <body>
   <p>جاري فتح التطبيق...</p>
   <script>
-    fetch('./app-v3.html?release=6', {cache:'no-store'})
+    fetch('./app-v3.html?release=7', {cache:'no-store'})
       .then(response => response.text())
       .then(html => {
-        html = html.replace('</body>', '<script src="./patch-v4.js?release=6"><\/script><script src="./patch-v5-pdf.js?release=6"><\/script></body>');
+        html = html.replace('</body>', '<script src="./patch-v4.js?release=7"><\/script><script src="./patch-v6-simple.js?release=7"><\/script></body>');
         document.open();
         document.write(html);
         document.close();
