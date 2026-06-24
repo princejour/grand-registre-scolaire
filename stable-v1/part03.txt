@@ -1,0 +1,171 @@
+g('تم الحفظ');
+    };
+    q('pick').onclick = () => q('files').click();
+    q('files').onchange = importFiles;
+    q('sample').onclick = sample;
+    document.querySelectorAll('.tabs button').forEach(button => {
+      button.onclick = () => {
+        active = +button.dataset.l;
+        save();
+        render();
+      };
+    });
+    q('holBtn').onclick = openHol;
+    q('close').onclick = () => q('modal').classList.remove('open');
+    q('addh').onclick = addHol;
+    q('parsePaste').onclick = parsePastedHolidays;
+    q('clearPaste').onclick = () => {
+      q('hpaste').value = '';
+      q('parseStatus').style.display = 'none';
+    };
+    q('saveh').onclick = () => {
+      S.holidays = temp;
+      save();
+      q('modal').classList.remove('open');
+      msg('تم حفظ العطل وستظهر في PDF والطباعة');
+    };
+    q('fixed').onclick = fixed;
+    q('clear').onclick = () => {
+      if (confirm('حذف جميع القائمات؟')) {
+        S.classes = [];
+        save();
+        render();
+      }
+    };
+    q('print').onclick = printBook;
+    q('pdf').onclick = pdfBook;
+  }
+
+  async function importFiles(event) {
+    if (typeof XLSX === 'undefined') {
+      msg('يلزم اتصال بالإنترنت أول مرة لتحميل قارئ Excel');
+      return;
+    }
+    const files = [...event.target.files];
+    let added = 0;
+    let rejected = 0;
+    q('busy').classList.add('on');
+
+    for (const file of files) {
+      try {
+        const wb = XLSX.read(await file.arrayBuffer(), {type:'array'});
+        for (const sheetName of wb.SheetNames) {
+          const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], {header:1,raw:false,defval:''});
+          const parsed = parseSheetClasses(file.name, sheetName, rows);
+          for (const cls of parsed.classes) {
+            const sameIndex = S.classes.findIndex(c => c.level === cls.level && c.num === cls.num && cls.level && cls.num);
+            if (sameIndex >= 0) S.classes.splice(sameIndex, 1, cls);
+            else S.classes.push(cls);
+            added++;
+          }
+          rejected += parsed.rejected;
+        }
+      } catch (error) {
+        console.error(error);
+        rejected++;
+      }
+    }
+
+    q('busy').classList.remove('on');
+    event.target.value = '';
+    sortClasses();
+    save();
+    render();
+    q('status').textContent = 'تم استيراد ' + added + ' قسم' + (rejected ? '، وتعذر تقسيم ' + rejected + ' قائمة.' : '.');
+    if (!added && rejected) msg('لم أجد عمود القسم. يجب أن تحتوي القائمة على عمود: القسم أو Classe');
+  }
+
+  function parseSheetClasses(fileName, sheetName, inputRows) {
+    const rows = inputRows
+      .map(r => r.map(v => String(v ?? '').trim()))
+      .filter(r => r.some(Boolean));
+    if (!rows.length) return {classes:[], rejected:0};
+
+    const context = norm(fileName + ' ' + sheetName + ' ' + rows.slice(0,12).flat().join(' '));
+    const globalLevel = detectLevel(context);
+    const headerIndex = findHeaderIndex(rows);
+    const header = headerIndex >= 0 ? rows[headerIndex] : [];
+    const data = headerIndex >= 0 ? rows.slice(headerIndex + 1) : rows;
+    const normalizedHeader = header.map(norm);
+
+    const nameInfo = locateNameColumns(normalizedHeader, data);
+    let classIndex = normalizedHeader.findIndex(h => /^(القسم|الفصل|classe|class|groupe|division|المستوى والقسم|القسم الحالي)$/.test(h) || /رقم القسم|اسم القسم|classe actuelle/.test(h));
+    if (classIndex < 0) classIndex = detectLikelyClassColumn(data, nameInfo.used);
+
+    if (classIndex >= 0) {
+      const groups = new Map();
+      for (const row of data) {
+        const student = extractNameFromRow(row, nameInfo);
+        const label = String(row[classIndex] || '').trim();
+        if (!probableName(student) || !label) continue;
+        const key = norm(label);
+        if (!groups.has(key)) groups.set(key, {label, students:[]});
+        groups.get(key).students.push(student);
+      }
+
+      const classes = [];
+      let sequence = 1;
+      for (const group of groups.values()) {
+        const classContext = norm(group.label + ' ' + context);
+        const level = detectLevel(norm(group.label)) || globalLevel;
+        let number = classNumber(norm(group.label), level);
+        if (!number && /^\d{1,2}$/.test(normalizeDigits(group.label)) && level) number = +normalizeDigits(group.label);
+        if (!number && level) number = nextAvailableNumber(level, classes, sequence++);
+        const students = [...new Set(group.students.map(cleanStudentName).filter(probableName))];
+        if (!level || !students.length) continue;
+        classes.push(makeClass(fileName, sheetName, level, number, students, group.label));
+      }
+      if (classes.length) return {classes, rejected:0};
+    }
+
+    // قائمة قسم واحد: تُقبل فقط إذا كان العدد منطقيًا.
+    const students = extractNames(rows);
+    if (students.length && students.length <= 60) {
+      const number = classNumber(context, globalLevel) || (globalLevel ? nextAvailableNumber(globalLevel, [], 1) : null);
+      return {classes:[makeClass(fileName, sheetName, globalLevel, number, students, sheetName)], rejected:0};
+    }
+    return {classes:[], rejected:1};
+  }
+
+  function findHeaderIndex(rows) {
+    let best = -1, bestScore = 0;
+    for (let i=0;i<Math.min(15, rows.length);i++) {
+      const text = norm(rows[i].join(' '));
+      let score = 0;
+      if (/الاسم|اللقب|التلميذ|nom|prenom|prénom/.test(text)) score += 10;
+      if (/القسم|الفصل|classe|groupe|division/.test(text)) score += 8;
+      score += rows[i].filter(Boolean).length;
+      if (score > bestScore) { bestScore = score; best = i; }
+    }
+    return bestScore >= 10 ? best : -1;
+  }
+
+  function locateNameColumns(normalizedHeader, data) {
+    const full = normalizedHeader.findIndex(x => /الاسم.*اللقب|اللقب.*الاسم|اسم.*التلميذ|nom.*prenom|prenom.*nom|nom complet/.test(x));
+    const first = normalizedHeader.findIndex(x => /^(الاسم|prenom|prénom)$/.test(x));
+    const last = normalizedHeader.findIndex(x => /^(اللقب|nom)$/.test(x));
+    if (full >= 0) return {mode:'full', full, used:[full]};
+    if (first >= 0 && last >= 0 && first !== last) return {mode:'split', first, last, used:[first,last]};
+
+    const maxCols = Math.max(1, ...data.map(r => r.length));
+    let best = 0, score = -1;
+    for (let c=0;c<maxCols;c++) {
+      const current = data.filter(r => probableName(cleanStudentName(r[c]))).length;
+      if (current > score) { score = current; best = c; }
+    }
+    return {mode:'full', full:best, used:[best]};
+  }
+
+  function extractNameFromRow(row, info) {
+    if (info.mode === 'split') return cleanStudentName((row[info.first] || '') + ' ' + (row[info.last] || ''));
+    return cleanStudentName(row[info.full] || '');
+  }
+
+  function detectLikelyClassColumn(data, excluded) {
+    const maxCols = Math.max(1, ...data.map(r => r.length));
+    let best = -1, bestScore = 0;
+    for (let c=0;c<maxCols;c++) {
+      if (excluded.includes(c)) continue;
+      const values = data.map(r => String(r[c] || '').trim()).filter(Boolean);
+      if (values.length < 3) continue;
+      const distinct = [...new Se
