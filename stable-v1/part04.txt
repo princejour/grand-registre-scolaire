@@ -1,0 +1,197 @@
+t(values.map(norm))];
+      if (distinct.length < 1 || distinct.length > 30) continue;
+      const repeated = values.length - distinct.length;
+      const classLike = values.filter(v => /السابع|الثامن|التاسع|سابعة|ثامنة|تاسعة|classe|\b[789]\b|^[1-9]\d?$/.test(norm(v))).length;
+      const score = repeated + classLike * 2;
+      if (score > bestScore && repeated >= Math.floor(values.length * .35)) { bestScore = score; best = c; }
+    }
+    return best;
+  }
+
+  function nextAvailableNumber(level, staged, start) {
+    const used = new Set([
+      ...S.classes.filter(c => c.level === level).map(c => c.num).filter(Boolean),
+      ...staged.filter(c => c.level === level).map(c => c.num).filter(Boolean)
+    ]);
+    let n = Math.max(1, start || 1);
+    while (used.has(n)) n++;
+    return n;
+  }
+
+  function makeClass(fileName, sheetName, level, number, students, originalLabel) {
+    return {
+      id: Date.now() + '-' + Math.random(),
+      level,
+      name: N[level] + ' ' + (number || nextNumber(level)),
+      num:number || null,
+      students,
+      source:fileName + ' / ' + sheetName + (originalLabel ? ' / ' + originalLabel : '')
+    };
+  }
+
+  function cleanStudentName(value) {
+    return String(value || '').replace(/^\s*\d+\s*[-.)]?\s*/,'').replace(/\s+/g,' ').trim();
+  }
+
+  function detectLevel(text) {
+    if (/السابع(?:ة)?|سابعة|septieme|septième|\b7\s*(?:a|eme|ème|e|اساسي|أساسي)?\b/i.test(text)) return 7;
+    if (/الثامن(?:ة)?|ثامنة|huitieme|huitième|\b8\s*(?:a|eme|ème|e|اساسي|أساسي)?\b/i.test(text)) return 8;
+    if (/التاسع(?:ة)?|تاسعة|neuvieme|neuvième|\b9\s*(?:a|eme|ème|e|اساسي|أساسي)?\b/i.test(text)) return 9;
+    return null;
+  }
+
+  function classNumber(text, level) {
+    if (!level) return null;
+    const value = normalizeDigits(norm(text));
+    const numericParts = (value.match(/\d{1,2}/g) || []).map(Number);
+    if (numericParts.length >= 2 && numericParts[0] === level && numericParts[1] >= 1 && numericParts[1] <= 30) return numericParts[1];
+    const patterns = [
+      new RegExp('(?:السابعة|سابعة|الثامنة|ثامنة|التاسعة|تاسعة|' + level + '\s*(?:a|eme|ème|e|اساسي|أساسي)?)\D{0,8}(\d{1,2})','i'),
+      /(?:قسم|classe|class|groupe|division)\s*[-_:]?\s*(\d{1,2})/i
+    ];
+    for (const pattern of patterns) {
+      const match = value.match(pattern);
+      if (match && +match[1] >= 1 && +match[1] <= 30) return +match[1];
+    }
+    if (numericParts.length === 1 && numericParts[0] !== level && numericParts[0] <= 30) return numericParts[0];
+    return null;
+  }
+
+  function nextNumber(level) {
+    const used = S.classes
+      .filter(c => c.level === level)
+      .map(c => c.num || +(String(c.name).match(/(\d+)$/) || [])[1])
+      .filter(Boolean);
+    let n = 1;
+    while (used.includes(n)) n++;
+    return n;
+  }
+
+  function extractNames(rows) {
+    rows = rows.map(r => r.map(v => String(v ?? '').trim())).filter(r => r.some(Boolean));
+    if (!rows.length) return [];
+
+    let headerIndex = -1;
+    for (let i=0;i<Math.min(10,rows.length);i++) {
+      if (/الاسم|اللقب|التلميذ|nom|prenom|prénom/i.test(norm(rows[i].join(' ')))) {
+        headerIndex = i;
+        break;
+      }
+    }
+
+    const header = headerIndex >= 0 ? rows[headerIndex] : [];
+    const data = headerIndex >= 0 ? rows.slice(headerIndex+1) : rows;
+    const normalizedHeader = header.map(norm);
+
+    const full = normalizedHeader.findIndex(x => /الاسم.*اللقب|اللقب.*الاسم|اسم.*التلميذ|nom.*prenom|prenom.*nom/.test(x));
+    const first = normalizedHeader.findIndex(x => /^(الاسم|prenom|prénom)$/.test(x));
+    const last = normalizedHeader.findIndex(x => /^(اللقب|nom)$/.test(x));
+
+    let names = [];
+    if (full >= 0) {
+      names = data.map(r => r[full]);
+    } else if (first >= 0 && last >= 0) {
+      names = data.map(r => ((r[first] || '') + ' ' + (r[last] || '')).trim());
+    } else {
+      const maxCols = Math.max(1, ...data.map(r => r.length));
+      let best = 0;
+      let score = -1;
+      for (let c=0;c<maxCols;c++) {
+        const s = data.filter(r => probableName(r[c])).length;
+        if (s > score) {
+          score = s;
+          best = c;
+        }
+      }
+      names = data.map(r => r[best]);
+    }
+
+    return [...new Set(
+      names
+        .map(cleanStudentName)
+        .filter(probableName)
+    )];
+  }
+
+  function probableName(value) {
+    const v = String(value || '');
+    return v.length > 2 &&
+      v.length < 80 &&
+      !/^\d+$/.test(v) &&
+      !/(الاسم|اللقب|التلميذ|المجموع|nom|prenom)/i.test(norm(v));
+  }
+
+  function sortClasses() {
+    S.classes.sort((a,b) => (a.level || 99) - (b.level || 99) || (a.num || 999) - (b.num || 999));
+  }
+
+  function render() {
+    [7,8,9].forEach(level => {
+      q('c' + level).textContent = S.classes.filter(c => c.level === level).length;
+      document.querySelector('[data-l="' + level + '"]').classList.toggle('active', level === active);
+    });
+
+    const classes = S.classes.filter(c => c.level === active);
+    q('classes').innerHTML = classes.length
+      ? classes.map(c => `
+        <div class="row" data-id="${esc(c.id)}">
+          <div>
+            <strong>${esc(c.name)} <span class="badge ${c.students.length > 60 ? 'warn' : ''}">${c.students.length} تلميذ</span></strong>
+            <small>${esc(c.source)}</small>
+          </div>
+          <div class="tools">
+            <select class="mv">
+              <option value="7" ${c.level===7?'selected':''}>السابعة</option>
+              <option value="8" ${c.level===8?'selected':''}>الثامنة</option>
+              <option value="9" ${c.level===9?'selected':''}>التاسعة</option>
+            </select>
+            <button class="secondary rn">تسمية</button>
+            <button class="danger del">حذف</button>
+          </div>
+        </div>`).join('')
+      : '<div class="empty">لا توجد قائمات في هذا المستوى</div>';
+
+    document.querySelectorAll('.row').forEach(row => {
+      const cls = S.classes.find(x => x.id === row.dataset.id);
+      row.querySelector('.mv').onchange = event => {
+        cls.level = +event.target.value;
+        if (!cls.num) cls.num = nextNumber(cls.level);
+        active = cls.level;
+        save();
+        sortClasses();
+        render();
+      };
+      row.querySelector('.rn').onclick = () => {
+        const name = prompt('اسم القسم', cls.name);
+        if (name) {
+          cls.name = name;
+          save();
+          render();
+        }
+      };
+      row.querySelector('.del').onclick = () => {
+        if (confirm('حذف ' + cls.name + '؟')) {
+          S.classes = S.classes.filter(x => x.id !== cls.id);
+          save();
+          render();
+        }
+      };
+    });
+  }
+
+  function openHol() {
+    temp = JSON.parse(JSON.stringify(S.holidays || []));
+    q('modal').classList.add('open');
+    renderHol();
+  }
+
+  function addHol() {
+    const name = q('hn').value.trim();
+    const start = q('hs').value;
+    const end = q('he').value || start;
+    if (!name || !start || end < start) {
+      msg('راجع اسم العطلة وتواريخها');
+      return;
+    }
+    addHolidayUnique({
+      id: Date.n
