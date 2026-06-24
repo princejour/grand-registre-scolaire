@@ -1,0 +1,201 @@
+<h1>الدفتر الكبير للغيابات</h1>
+  <p>استيراد القائمات وإصدار كتاب مستقل لكل مستوى</p>
+</header>
+
+<main class="wrap">
+  <section class="card">
+    <h2>1 ـ إعداد المؤسسة والسنة</h2>
+    <div class="grid">
+      <label>اسم المؤسسة<input id="school" placeholder="اسم المؤسسة"></label>
+      <label>بداية السنة<select id="year"></select></label>
+      <label>نهاية السنة<input id="year2" readonly></label>
+    </div>
+    <div class="actions">
+      <button class="primary" id="save">حفظ</button>
+      <button class="secondary" id="holBtn">ضبط العطل</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>2 ـ استيراد قائمات التلاميذ</h2>
+    <p class="hint">يمكن رفع عدة ملفات CSV أو Excel. يتعرف التطبيق آليًا على المستوى والقسم من اسم الملف أو اسم ورقة Excel أو محتوى القائمة، ويمكن تعديل التصنيف بعد الاستيراد.</p>
+    <div class="import">
+      <input id="files" type="file" multiple accept=".csv,.xlsx,.xls" hidden>
+      <button class="primary" id="pick">اختيار القائمات</button>
+      <button class="secondary" id="sample">نموذج CSV</button>
+    </div>
+    <div id="status" class="hint"></div>
+  </section>
+
+  <section class="card">
+    <h2>3 ـ اختيار المستوى ومراجعة الأقسام</h2>
+    <div class="tabs">
+      <button data-l="7">السابعة <b id="c7">0</b></button>
+      <button data-l="8">الثامنة <b id="c8">0</b></button>
+      <button data-l="9">التاسعة <b id="c9">0</b></button>
+    </div>
+    <div id="classes" class="list"></div>
+    <div class="actions">
+      <button class="primary" id="pdf">تصدير PDF</button>
+      <button class="success" id="print">طباعة مباشرة</button>
+      <button class="danger" id="clear">حذف القائمات</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>تنسيق الكتاب</h2>
+    <p class="hint">كل مستوى في كتاب مستقل، وكل قسم يحتوي على 8 صفحات من أكتوبر إلى ماي. المقاس A3 أفقي والطباعة على الوجهين مع التقليب على الحافة القصيرة. الأحد والعطل المدرسية والوطنية والدينية مظللة.</p>
+  </section>
+</main>
+
+<div id="modal" class="modal">
+  <div class="box">
+    <div class="boxhead">
+      <h2>ضبط العطل</h2>
+      <button id="close">إغلاق</button>
+    </div>
+
+    <div class="pastebox">
+      <h3>لصق رزنامة العطل دفعة واحدة</h3>
+      <p class="example">
+        الصق كل عطلة في سطر. يقبل التطبيق مثلًا:<br>
+        عطلة نصف الثلاثي الأول: من 26 أكتوبر 2025 إلى 2 نوفمبر 2025<br>
+        عيد الجلاء: 15/10/2025<br>
+        عطلة الربيع | 15-03-2026 إلى 29-03-2026 | مدرسية
+      </p>
+      <textarea id="hpaste" placeholder="الصق رزنامة العطل هنا..."></textarea>
+      <div class="actions">
+        <button class="primary" id="parsePaste">تحليل وإضافة العطل</button>
+        <button class="secondary" id="clearPaste">مسح المربع</button>
+      </div>
+      <div id="parseStatus" class="parse-status"></div>
+    </div>
+
+    <h3>إضافة عطلة يدويًا</h3>
+    <div class="holidayform">
+      <label>الاسم<input id="hn"></label>
+      <label>الصنف
+        <select id="ht">
+          <option value="school">مدرسية</option>
+          <option value="national">وطنية</option>
+          <option value="religious">دينية</option>
+        </select>
+      </label>
+      <label>من<input id="hs" type="date"></label>
+      <label>إلى<input id="he" type="date"></label>
+      <button class="primary" id="addh">إضافة</button>
+    </div>
+
+    <div class="actions">
+      <button class="secondary" id="fixed">إضافة المناسبات الوطنية الثابتة</button>
+    </div>
+
+    <div id="hlist"></div>
+
+    <div class="actions">
+      <button class="primary" id="saveh">حفظ العطل</button>
+    </div>
+  </div>
+</div>
+
+<div id="busy" class="busy">جاري إعداد الكتاب...</div>
+<div id="toast" class="toast"></div>
+<div id="printRoot"></div>
+
+<script>
+(() => {
+  'use strict';
+
+  const K = 'grand-registre-v4';
+  const N = {7:'السابعة',8:'الثامنة',9:'التاسعة'};
+  const M = [[9,'أكتوبر'],[10,'نوفمبر'],[11,'ديسمبر'],[0,'جانفي'],[1,'فيفري'],[2,'مارس'],[3,'أفريل'],[4,'ماي']];
+  const D = ['أح','إث','ثل','أر','خم','جم','سب'];
+  const MONTH_INDEX = {
+    'يناير':1,'جانفي':1,'janvier':1,'january':1,
+    'فبراير':2,'فيفري':2,'fevrier':2,'février':2,'february':2,
+    'مارس':3,'mars':3,'march':3,
+    'أبريل':4,'ابريل':4,'أفريل':4,'افريل':4,'avril':4,'april':4,
+    'مايو':5,'ماي':5,'mai':5,'may':5,
+    'يونيو':6,'جوان':6,'juin':6,'june':6,
+    'يوليو':7,'جويلية':7,'juillet':7,'july':7,
+    'أغسطس':8,'اوت':8,'أوت':8,'aout':8,'août':8,'august':8,
+    'سبتمبر':9,'septembre':9,'september':9,
+    'أكتوبر':10,'اكتوبر':10,'octobre':10,'october':10,
+    'نوفمبر':11,'novembre':11,'november':11,
+    'ديسمبر':12,'decembre':12,'décembre':12,'december':12
+  };
+
+  let S = load();
+  let active = S.active || 7;
+  let temp = [];
+
+  const q = id => document.getElementById(id);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const pad = n => String(n).padStart(2,'0');
+  const iso = d => d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
+
+  function load() {
+    const defaults = {
+      school:'',
+      year:new Date().getMonth()>7 ? new Date().getFullYear() : new Date().getFullYear()-1,
+      active:7,
+      classes:[],
+      holidays:[]
+    };
+    try {
+      const v2 = JSON.parse(localStorage.getItem('grand-registre-v2') || '{}');
+      const v3 = JSON.parse(localStorage.getItem('grand-registre-v3') || '{}');
+      const current = JSON.parse(localStorage.getItem(K) || '{}');
+      const merged = Object.assign({}, defaults, v2, v3, current);
+      // حذف القائمات الخاطئة القديمة التي جُمعت فيها عدة أقسام داخل قسم واحد.
+      merged.classes = (merged.classes || []).filter(c => Array.isArray(c.students) && c.students.length > 0 && c.students.length <= 60);
+      return merged;
+    } catch (e) {
+      return defaults;
+    }
+  }
+
+  function save() {
+    S.active = active;
+    localStorage.setItem(K, JSON.stringify(S));
+  }
+
+  function msg(text) {
+    q('toast').textContent = text;
+    q('toast').style.display = 'block';
+    setTimeout(() => q('toast').style.display = 'none', 3000);
+  }
+
+  function norm(value) {
+    return String(value || '')
+      .toLowerCase()
+      .replace(/[إأآ]/g,'ا')
+      .replace(/[ًٌٍَُِّْـ]/g,'')
+      .replace(/\s+/g,' ')
+      .trim();
+  }
+
+  function normalizeDigits(value) {
+    return String(value || '')
+      .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
+      .replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
+  }
+
+  function init() {
+    const y = new Date().getFullYear();
+    for (let i=y-2;i<=y+5;i++) q('year').add(new Option(i,i));
+    q('school').value = S.school;
+    q('year').value = S.year;
+    q('year2').value = S.year + 1;
+    bind();
+    render();
+    if ('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister())).catch(() => {});
+  }
+
+  function bind() {
+    q('year').onchange = () => q('year2').value = +q('year').value + 1;
+    q('save').onclick = () => {
+      S.school = q('school').value.trim();
+      S.year = +q('year').value;
+      save();
+      ms
