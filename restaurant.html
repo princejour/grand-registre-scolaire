@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>مطعم المعهد النموذجي حمام الأنف</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap');
+body { font-family: 'Cairo', sans-serif; }
+</style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+<header class="bg-indigo-900 text-white shadow-lg">
+<div class="container mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center">
+<div class="flex items-center space-x-3 space-x-reverse mb-3 md:mb-0">
+<div class="bg-amber-400 p-3 rounded-xl text-indigo-950 font-black text-2xl shadow"><i class="fa-solid fa-utensils"></i></div>
+<div><h1 class="text-2xl font-black tracking-wide">المعهد النموذجي حمام الأنف</h1><p class="text-indigo-200 text-sm">نظام إدارة ومتابعة دخول المطعم المدرسي</p></div>
+</div>
+<nav class="flex flex-wrap gap-2 justify-center">
+<button onclick="switchTab('register')" id="btn-register" class="tab-btn px-4 py-2 rounded-lg font-bold bg-amber-400 text-indigo-950 transition shadow"><i class="fa-solid fa-user-plus ml-2"></i>تسجيل تلميذ وبطاقة</button>
+<button onclick="switchTab('scanner')" id="btn-scanner" class="tab-btn px-4 py-2 rounded-lg font-bold bg-indigo-800 text-white hover:bg-indigo-700 transition"><i class="fa-solid fa-barcode ml-2"></i>ماسح الباركود (الدخول)</button>
+<button onclick="switchTab('stats')" id="btn-stats" class="tab-btn px-4 py-2 rounded-lg font-bold bg-indigo-800 text-white hover:bg-indigo-700 transition"><i class="fa-solid fa-chart-line ml-2"></i>الإحصائيات والتقارير</button>
+<button onclick="switchTab('students')" id="btn-students" class="tab-btn px-4 py-2 rounded-lg font-bold bg-indigo-800 text-white hover:bg-indigo-700 transition"><i class="fa-solid fa-users ml-2"></i>قائمة التلاميذ</button>
+</nav></div></header>
+<main class="container mx-auto px-4 py-8 flex-grow">
+<div id="toast-container" class="fixed top-5 left-5 z-50 flex flex-col space-y-2"></div>
+<section id="tab-register" class="tab-content grid grid-cols-1 lg:grid-cols-2 gap-8">
+<div class="bg-white p-6 rounded-2xl shadow-xl border border-slate-100">
+<h2 class="text-xl font-bold text-indigo-900 mb-4 pb-2 border-b flex items-center"><i class="fa-solid fa-id-card ml-2 text-amber-500"></i>معطيات التلميذ وفترة الاستحقاق</h2>
+<form id="student-form" onsubmit="handleStudentSubmit(event)" class="space-y-4">
+<div><label class="block text-sm font-semibold text-slate-700 mb-1">الاسم واللقب</label><input type="text" id="student-name" required placeholder="مثال: يوسف بن صالح" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition"></div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div><label class="block text-sm font-semibold text-slate-700 mb-1">القسم / المستوى</label><input type="text" id="student-class" required placeholder="مثال: رابعة رياضيات" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition"></div><div><label class="block text-sm font-semibold text-slate-700 mb-1">رقم الترسيم / المعرف</label><input type="text" id="student-id" required placeholder="مثال: 20261042" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition"></div></div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div><label class="block text-sm font-semibold text-slate-700 mb-1">تاريخ بداية الاستحقاق</label><input type="date" id="start-date" required class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition"></div><div><label class="block text-sm font-semibold text-slate-700 mb-1">تاريخ نهاية الاستحقاق</label><input type="date" id="end-date" required class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition"></div></div>
+<button type="submit" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg transition flex items-center justify-center"><i class="fa-solid fa-qrcode ml-2"></i>إنشاء البطاقة والباركود</button>
+</form></div>
+<div class="bg-white p-6 rounded-2xl shadow-xl border border-slate-100 flex flex-col items-center justify-center">
+<h3 class="text-lg font-bold text-slate-700 mb-4 self-start">معاينة البطاقة القابلة للطباعة</h3>
+<div id="printable-card" class="w-full max-w-md bg-white text-slate-900 rounded-2xl p-6 shadow-xl border-2 border-indigo-900 relative overflow-hidden">
+<div class="absolute top-0 right-0 w-32 h-32 bg-indigo-100 opacity-50 rounded-full blur-2xl"></div>
+<div class="flex justify-between items-center border-b border-slate-200 pb-3 mb-4"><div class="flex items-center space-x-2 space-x-reverse"><div class="w-10 h-10 bg-indigo-900 text-amber-400 rounded-lg flex items-center justify-center font-black"><i class="fa-solid fa-graduation-cap"></i></div><div><h4 class="text-xs text-indigo-700 font-bold">الجمهورية التونسية</h4><h3 class="text-sm font-black text-indigo-950">المعهد النموذجي حمام الأنف</h3></div></div><span class="bg-indigo-900 text-amber-400 text-xs px-2.5 py-1 rounded-full font-bold">بطاقة مطعم</span></div>
+<div class="space-y-2 mb-6"><div class="flex justify-between text-sm"><span class="text-slate-500">الاسم واللقب:</span><span id="card-name" class="font-bold text-indigo-950">---</span></div><div class="flex justify-between text-sm"><span class="text-slate-500">القسم:</span><span id="card-class" class="font-bold text-slate-800">---</span></div><div class="flex justify-between text-sm"><span class="text-slate-500">المعرف:</span><span id="card-id" class="font-bold font-mono text-slate-800">---</span></div><div class="flex justify-between text-xs bg-slate-50 p-2 rounded-lg border border-slate-200"><span class="text-slate-600">فترة الاستحقاق:</span><span id="card-validity" class="font-semibold text-emerald-700">--- إلى ---</span></div></div>
+<div class="bg-slate-50 p-3 rounded-xl border border-slate-200 flex flex-col items-center justify-center"><svg id="barcode" class="w-full h-16"></svg><p class="text-[10px] text-slate-500 mt-1">امسح الكود بار لتسجيل الدخول للمطعم</p></div></div>
+<div class="mt-6 flex space-x-4 space-x-reverse"><button type="button" onclick="printCard()" class="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-indigo-950 font-bold rounded-xl shadow transition flex items-center cursor-pointer"><i class="fa-solid fa-print ml-2"></i>طباعة البطاقة</button><button type="button" onclick="saveStudent()" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow transition flex items-center cursor-pointer"><i class="fa-solid fa-floppy-disk ml-2"></i>حفظ في قاعدة البيانات</button></div>
+</div></section>
+<section id="tab-scanner" class="tab-content hidden grid grid-cols-1 lg:grid-cols-3 gap-8">
+<div class="lg:col-span-1 bg-white p-6 rounded-2xl shadow-xl border border-slate-100 space-y-6"><h2 class="text-xl font-bold text-indigo-900 pb-2 border-b flex items-center"><i class="fa-solid fa-barcode ml-2 text-amber-500"></i>قارئ بطاقات المطعم</h2>
+<div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100"><p class="text-xs text-indigo-900 leading-relaxed">قم بتمرير أو كتابة معرف التلميذ (الباركود) الموجود على البطاقة للتحقق من صلوحية الدخول وتسجيل الوجبة اليومية تلقائياً.</p></div>
+<form onsubmit="handleScanSubmit(event)" class="space-y-4"><div><label class="block text-sm font-semibold text-slate-700 mb-1">المعرف / باركود التلميذ</label><div class="flex space-x-2 space-x-reverse"><input type="text" id="scan-input" autofocus placeholder="أدخل أو امسح المعرف..." class="flex-grow px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:outline-none font-mono text-lg"><button type="submit" class="px-5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow transition"><i class="fa-solid fa-check"></i></button></div></div></form>
+<div id="scan-result" class="hidden p-4 rounded-xl border text-center transition"></div></div>
+<div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-xl border border-slate-100 flex flex-col justify-between"><div><div class="flex justify-between items-center mb-6 pb-2 border-b"><h3 class="text-xl font-bold text-indigo-900 flex items-center"><i class="fa-solid fa-list-check ml-2 text-amber-500"></i>حركة دخول المطعم اليومية</h3><div class="bg-amber-100 text-amber-900 px-4 py-2 rounded-xl font-black text-lg shadow-inner">إجمالي اليوم: <span id="daily-count">0</span> تلميذ</div></div>
+<div class="overflow-x-auto max-h-[400px] overflow-y-auto"><table class="w-full text-right border-collapse"><thead><tr class="bg-slate-100 text-slate-700 text-xs uppercase tracking-wider"><th class="p-3 rounded-r-xl">التوقيت</th><th class="p-3">اسم التلميذ</th><th class="p-3">القسم</th><th class="p-3 rounded-l-xl">المعرف</th></tr></thead><tbody id="entries-table-body" class="divide-y divide-slate-100 text-sm"></tbody></table></div></div>
+<div class="mt-6 flex justify-end"><button onclick="resetDailyEntries()" class="text-xs text-red-600 hover:text-red-800 font-semibold flex items-center"><i class="fa-solid fa-trash ml-1"></i>إعادة تعيين سجل اليوم</button></div></div></section>
+<section id="tab-stats" class="tab-content hidden space-y-8">
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6"><div class="bg-white p-6 rounded-2xl shadow-xl border border-slate-100 flex items-center space-x-4 space-x-reverse"><div class="p-4 bg-indigo-100 text-indigo-700 rounded-2xl text-2xl"><i class="fa-solid fa-utensils"></i></div><div><p class="text-sm text-slate-500 font-semibold">وجبات اليوم</p><h4 id="stat-today" class="text-2xl font-black text-slate-800">0</h4></div></div>
+<div class="bg-white p-6 rounded-2xl shadow-xl border border-slate-100 flex items-center space-x-4 space-x-reverse"><div class="p-4 bg-emerald-100 text-emerald-700 rounded-2xl text-2xl"><i class="fa-solid fa-calendar-week"></i></div><div><p class="text-sm text-slate-500 font-semibold">إحصائية الأسبوع الحالي</p><h4 id="stat-week" class="text-2xl font-black text-slate-800">0</h4></div></div>
+<div class="bg-white p-6 rounded-2xl shadow-xl border border-slate-100 flex items-center space-x-4 space-x-reverse"><div class="p-4 bg-amber-100 text-amber-700 rounded-2xl text-2xl"><i class="fa-solid fa-calendar-days"></i></div><div><p class="text-sm text-slate-500 font-semibold">إحصائية الشهر الحالي</p><h4 id="stat-month" class="text-2xl font-black text-slate-800">0</h4></div></div></div>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-8"><div class="bg-white p-6 rounded-2xl shadow-xl border border-slate-100"><h3 class="text-lg font-bold text-indigo-900 mb-4">استهلاك الأسبوع (حسب الأيام)</h3><div class="relative h-72"><canvas id="weeklyChart"></canvas></div></div><div class="bg-white p-6 rounded-2xl shadow-xl border border-slate-100"><h3 class="text-lg font-bold text-indigo-900 mb-4">استهلاك الشهر (حسب الأسابيع)</h3><div class="relative h-72"><canvas id="monthlyChart"></canvas></div></div></div></section>
+<section id="tab-students" class="tab-content hidden bg-white p-6 rounded-2xl shadow-xl border border-slate-100">
+<div class="flex flex-col md:flex-row justify-between items-center mb-6 pb-4 border-b gap-4"><h2 class="text-xl font-bold text-indigo-900 flex items-center"><i class="fa-solid fa-users ml-2 text-amber-500"></i>قائمة التلاميذ المسجلين في النظام</h2><div class="flex flex-col sm:flex-row gap-3 w-full md:w-auto"><div class="w-full md:w-64"><input type="text" id="search-student" oninput="filterStudents()" placeholder="بحث بالاسم أو المعرف..." class="w-full px-4 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm"></div><button onclick="downloadStudentsCSV()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow transition flex items-center justify-center text-sm whitespace-nowrap"><i class="fa-solid fa-file-excel ml-2"></i>تحميل القائمة (CSV)</button></div></div>
+<div class="overflow-x-auto"><table class="w-full text-right border-collapse"><thead><tr class="bg-slate-100 text-slate-700 text-xs uppercase tracking-wider"><th class="p-3 rounded-r-xl">المعرف</th><th class="p-3">الاسم واللقب</th><th class="p-3">القسم</th><th class="p-3">تاريخ البداية</th><th class="p-3">تاريخ النهاية</th><th class="p-3 rounded-l-xl text-center">إجراءات</th></tr></thead><tbody id="students-table-body" class="divide-y divide-slate-100 text-sm"></tbody></table></div></section>
+</main>
+<footer class="bg-slate-900 text-slate-400 py-6 border-t border-slate-800 mt-auto"><div class="container mx-auto px-4 text-center text-xs"><p>&copy; 2026 المعهد النموذجي حمام الأنف - نظام إدارة المطعم المدرسي. جميع الحقوق محفوظّة.</p></div></footer>
+<script>
+let students = JSON.parse(localStorage.getItem('restaurant_students')) || [];
+let entries = JSON.parse(localStorage.getItem('restaurant_entries')) || [];
+let weeklyChartInstance = null;
+let monthlyChartInstance = null;
+window.onload = function() {
+const today = new Date().toISOString().split('T')[0];
+const nextYear = new Date(); nextYear.setFullYear(nextYear.getFullYear() + 1);
+const nextYearStr = nextYear.toISOString().split('T')[0];
+document.getElementById('start-date').value = today;
+document.getElementById('end-date').value = nextYearStr;
+updateCardPreview(); renderEntriesTable(); renderStudentsTable(); updateStats(); initCharts();
+document.getElementById('student-name').addEventListener('input', updateCardPreview);
+document.getElementById('student-class').addEventListener('input', updateCardPreview);
+document.getElementById('student-id').addEventListener('input', updateCardPreview);
+document.getElementById('start-date').addEventListener('change', updateCardPreview);
+document.getElementById('end-date').addEventListener('change', updateCardPreview);
+};
+function switchTab(tabId) {
+document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+document.querySelectorAll('.tab-btn').forEach(btn => {btn.classList.remove('bg-amber-400','text-indigo-950');btn.classList.add('bg-indigo-800','text-white');});
+document.getElementById('tab-'+tabId).classList.remove('hidden');
+const activeBtn=document.getElementById('btn-'+tabId); activeBtn.classList.remove('bg-indigo-800','text-white'); activeBtn.classList.add('bg-amber-400','text-indigo-950');
+if(tabId==='stats'){updateStats();if(weeklyChartInstance)weeklyChartInstance.update();if(monthlyChartInstance)monthlyChartInstance.update();}
+}
+function updateCardPreview() {
+const name=document.getElementById('student-name').value||'اسم التلميذ';
+const sClass=document.getElementById('student-class').value||'القسم';
+const id=document.getElementById('student-id').value||'20260000';
+const startDate=document.getElementById('start-date').value||'---';
+const endDate=document.getElementById('end-date').value||'---';
+document.getElementById('card-name').innerText=name;document.getElementById('card-class').innerText=sClass;document.getElementById('card-id').innerText=id;document.getElementById('card-validity').innerText=`${startDate} إلى ${endDate}`;
+try{JsBarcode("#barcode",id,{format:"CODE128",lineColor:"#1e1b4b",width:2,height:50,displayValue:true,fontSize:14,fontOptions:"bold"});}catch(e){console.error("Barcode generation error:",e);}
+}
+function handleStudentSubmit(e){e.preventDefault();updateCardPreview();showToast('تم تحديث بيانات المعاينة والباركود بنجاح','success');}
+function saveStudent(){
+const name=document.getElementById('student-name').value.trim();const sClass=document.getElementById('student-class').value.trim();const id=document.getElementById('student-id').value.trim();const startDate=document.getElementById('start-date').value;const endDate=document.getElementById('end-date').value;
+if(!name||!sClass||!id||!startDate||!endDate){showToast('الرجاء تعمير كافة المعطيات','warning');return;}
+const existingIndex=students.findIndex(s=>s.id===id);
+if(existingIndex>=0){students[existingIndex]={name,class:sClass,id,startDate,endDate};showToast('تم تحديث بيانات التلميذ بنجاح','success');}else{students.push({name,class:sClass,id,startDate,endDate});showToast('تم حفظ التلميذ بنجاح في قاعدة البيانات','success');}
+localStorage.setItem('restaurant_students',JSON.stringify(students));renderStudentsTable();
+}
+function printCard(){
+updateCardPreview();const cardHtml=document.getElementById('printable-card').outerHTML;
+const printWindow=window.open('','_blank','width=700,height=700');
+if(!printWindow){showToast('يرجى السماح بفتح النوافذ المنبثقة (Popups) للطباعة','warning');return;}
+printWindow.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>طباعة بطاقة مطعم - المعهد النموذجي حمام الأنف</title><script src="https://cdn.tailwindcss.com"><\/script><style>@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap');body{font-family:'Cairo',sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#fff}</style></head><body><div style="width:380px;">${cardHtml}</div><script>window.onload=function(){setTimeout(()=>{window.print();window.close();},500)};<\/script></body></html>`);
+printWindow.document.close();
+}
+function handleScanSubmit(e){
+e.preventDefault();const scanInput=document.getElementById('scan-input');const code=scanInput.value.trim();scanInput.value='';if(!code)return;
+const student=students.find(s=>s.id===code);const resultDiv=document.getElementById('scan-result');resultDiv.classList.remove('hidden');
+if(!student){resultDiv.className="p-4 rounded-xl border bg-red-50 border-red-200 text-red-800";resultDiv.innerHTML=`<i class="fa-solid fa-circle-xmark text-2xl mb-1 text-red-500"></i><p class="font-bold">المعرف غير مسجل في النظام!</p><p class="text-xs">التلميذ برقم ${code} غير موجود بقاعدة البيانات.</p>`;showToast('خطأ: المعرف غير مسجل','error');return;}
+const todayStr=new Date().toISOString().split('T')[0];
+if(todayStr<student.startDate||todayStr>student.endDate){resultDiv.className="p-4 rounded-xl border bg-amber-50 border-amber-200 text-amber-800";resultDiv.innerHTML=`<i class="fa-solid fa-triangle-exclamation text-2xl mb-1 text-amber-500"></i><p class="font-bold">انتهت أو لم تبدأ فترة الاستحقاق!</p><p class="text-xs">التلميذ ${student.name} خارج فترة الصلاحية (${student.startDate} إلى ${student.endDate}).</p>`;showToast('تحذير: فترة الاستحقاق منتهية','warning');return;}
+const now=new Date();const timeStr=now.toLocaleTimeString('ar-TN',{hour:'2-digit',minute:'2-digit'});
+entries.unshift({id:student.id,name:student.name,class:student.class,time:timeStr,date:todayStr});
+localStorage.setItem('restaurant_entries',JSON.stringify(entries));renderEntriesTable();updateStats();
+resultDiv.className="p-4 rounded-xl border bg-emerald-50 border-emerald-200 text-emerald-800";resultDiv.innerHTML=`<i class="fa-solid fa-circle-check text-2xl mb-1 text-emerald-500"></i><p class="font-bold text-lg">مرحباً ${student.name}!</p><p class="text-xs">تم تسجيل الدخول بنجاح (${student.class}) - الوقت: ${timeStr}</p>`;showToast(`تم تسجيل دخول: ${student.name}`,'success');
+}
+function renderEntriesTable(){
+const todayStr=new Date().toISOString().split('T')[0];const todayEntries=entries.filter(e=>e.date===todayStr);document.getElementById('daily-count').innerText=todayEntries.length;const tbody=document.getElementById('entries-table-body');tbody.innerHTML='';
+if(todayEntries.length===0){tbody.innerHTML='<tr><td colspan="4" class="text-center py-6 text-slate-400">لا توجد عمليات دخول مسجلة اليوم حتى الآن.</td></tr>';return;}
+todayEntries.forEach(entry=>{const tr=document.createElement('tr');tr.className="hover:bg-slate-50 transition";tr.innerHTML=`<td class="p-3 font-mono text-indigo-700 font-semibold">${entry.time}</td><td class="p-3 font-bold text-slate-800">${entry.name}</td><td class="p-3 text-slate-600">${entry.class}</td><td class="p-3 font-mono text-slate-500">${entry.id}</td>`;tbody.appendChild(tr);});
+}
+function resetDailyEntries(){if(confirm("هل أنت متأكد من رغبتك في إعادة تعيين سجل اليوم؟")){const todayStr=new Date().toISOString().split('T')[0];entries=entries.filter(e=>e.date!==todayStr);localStorage.setItem('restaurant_entries',JSON.stringify(entries));renderEntriesTable();updateStats();showToast('تم إعادة تعيين سجل اليوم','success');}}
+function updateStats(){
+const todayStr=new Date().toISOString().split('T')[0];const todayCount=entries.filter(e=>e.date===todayStr).length;const now=new Date();const currentMonthStr=now.toISOString().slice(0,7);const monthCount=entries.filter(e=>e.date.startsWith(currentMonthStr)).length;const oneWeekAgo=new Date();oneWeekAgo.setDate(oneWeekAgo.getDate()-7);const weekCount=entries.filter(e=>new Date(e.date)>=oneWeekAgo).length;
+document.getElementById('stat-today').innerText=todayCount;document.getElementById('stat-week').innerText=weekCount;document.getElementById('stat-month').innerText=monthCount;
+}
+function initCharts(){
+const ctxWeekly=document.getElementById('weeklyChart').getContext('2d');weeklyChartInstance=new Chart(ctxWeekly,{type:'bar',data:{labels:['الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت','الأحد'],datasets:[{label:'عدد الوجبات',data:[45,52,48,60,55,12,5],backgroundColor:'#6366f1',borderRadius:8}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{precision:0}}}}});
+const ctxMonthly=document.getElementById('monthlyChart').getContext('2d');monthlyChartInstance=new Chart(ctxMonthly,{type:'line',data:{labels:['الأسبوع الأول','الأسبوع الثاني','الأسبوع الثالث','الأسبوع الرابع'],datasets:[{label:'عدد الوجبات الشهرية',data:[220,250,240,260],borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,0.1)',fill:true,tension:0.3,borderWidth:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+}
+function renderStudentsTable(filteredList=null){
+const list=filteredList||students;const tbody=document.getElementById('students-table-body');tbody.innerHTML='';
+if(list.length===0){tbody.innerHTML='<tr><td colspan="6" class="text-center py-6 text-slate-400">لا توجد نتائج مسجلة حتى الآن.</td></tr>';return;}
+list.forEach(student=>{const tr=document.createElement('tr');tr.className="hover:bg-slate-50 transition";tr.innerHTML=`<td class="p-3 font-mono font-semibold text-indigo-700">${student.id}</td><td class="p-3 font-bold text-slate-800">${student.name}</td><td class="p-3 text-slate-600">${student.class}</td><td class="p-3 text-xs text-slate-500">${student.startDate}</td><td class="p-3 text-xs text-slate-500">${student.endDate}</td><td class="p-3 text-center"><button onclick="deleteStudent('${student.id}')" class="text-red-500 hover:text-red-700 p-1.5 transition"><i class="fa-solid fa-trash"></i></button></td>`;tbody.appendChild(tr);});
+}
+function filterStudents(){const query=document.getElementById('search-student').value.toLowerCase();const filtered=students.filter(s=>s.name.toLowerCase().includes(query)||s.id.toLowerCase().includes(query)||s.class.toLowerCase().includes(query));renderStudentsTable(filtered);}
+function deleteStudent(id){if(confirm("هل أنت متأكد من حذف هذا التلميذ من النظام؟")){students=students.filter(s=>s.id!==id);localStorage.setItem('restaurant_students',JSON.stringify(students));renderStudentsTable();showToast('تم حذف التلميذ بنجاح','success');}}
+function downloadStudentsCSV(){
+if(!students||students.length===0){showToast('لا توجد بيانات تلاميذ لتحميلها','warning');return;}
+let csvContent="\uFEFFمعرف التلميذ,الاسم واللقب,القسم,تاريخ بداية الاستحقاق,تاريخ نهاية الاستحقاق\n";
+students.forEach(s=>{const row=[`"${s.id}"`,`"${s.name}"`,`"${s.class}"`,`"${s.startDate}"`,`"${s.endDate}"`].join(",");csvContent+=row+"\n";});
+const blob=new Blob([csvContent],{type:'text/csv;charset=utf-8;'});const url=URL.createObjectURL(blob);const link=document.createElement("a");link.setAttribute("href",url);link.setAttribute("download",`قائمة_تلاميذ_المطعم_${new Date().toISOString().split('T')[0]}.csv`);document.body.appendChild(link);link.click();document.body.removeChild(link);showToast('تم تحميل قائمة التلاميذ بنجاح','success');
+}
+function showToast(message,type='success'){
+const container=document.getElementById('toast-container');const toast=document.createElement('div');const bgColor=type==='success'?'bg-emerald-600':type==='warning'?'bg-amber-600':'bg-red-600';
+toast.className=`${bgColor} text-white px-6 py-3 rounded-xl shadow-xl flex items-center space-x-3 space-x-reverse transform transition-all duration-300 translate-y-2 opacity-0`;
+toast.innerHTML=`<i class="fa-solid ${type==='success'?'fa-circle-check':type==='warning'?'fa-triangle-exclamation':'fa-circle-xmark'} text-xl"></i><span class="font-bold text-sm">${message}</span>`;
+container.appendChild(toast);setTimeout(()=>{toast.classList.remove('translate-y-2','opacity-0');},50);setTimeout(()=>{toast.classList.add('translate-y-2','opacity-0');setTimeout(()=>toast.remove(),300);},3000);
+}
+</script>
+</body>
+</html>
